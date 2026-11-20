@@ -1,6 +1,6 @@
 import useDebounced from "@/hooks/useDebounced";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   BlurEvent,
@@ -20,34 +20,31 @@ import { getQuotes, Quote } from "../query/query";
 export default function Index() {
   const insets = useSafeAreaInsets();
   const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchActive, setSearchActive] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [totalQuotes, setTotalQuotes] = useState(0);
-  const [page, setPage] = useState(1);
-  const pageSize = 20;
+  const pageSize = 100;
   const [error, setError] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const requestInFlight = useRef(false);
 
   const debouncedSearchQuery = useDebounced(searchQuery, 500);
 
   const loadQuotes = useCallback(
     async ({
       mode,
-      page,
+      skip,
       limit,
     }: {
       mode: "initial" | "refresh" | "loadMore";
-      page: number;
+      skip: number;
       limit: number;
     }) => {
-      if (loading || refreshing || isLoadingMore) return;
+      if (requestInFlight.current) return;
+      requestInFlight.current = true;
 
-      setError(null);
-      if (mode === "initial") {
-        setLoading(true);
-      }
       if (mode === "refresh") {
         setRefreshing(true);
       }
@@ -55,39 +52,40 @@ export default function Index() {
         setIsLoadingMore(true);
       }
 
-      const result = await getQuotes({ limit, skip: (page - 1) * limit });
+      try {
+        const result = await getQuotes({ limit, skip });
 
-      setLoading(false);
-      setRefreshing(false);
-      setIsLoadingMore(false);
+        if (result.error) {
+          setError(result.error);
+          return;
+        }
 
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-
-      if (result.quotes) {
-        // console.log("Fetched quotes: ", result.quotes[0]);
-        setQuotes((prevQuotes) =>
-          mode === "loadMore"
-            ? [...prevQuotes, ...(result?.quotes || [])]
-            : result?.quotes || [],
-        );
-        setTotalQuotes(result?.total || 0);
+        if (result.quotes) {
+          setError(null);
+          setQuotes((prevQuotes) =>
+            mode === "loadMore"
+              ? [...prevQuotes, ...result.quotes]
+              : result.quotes,
+          );
+          setTotalQuotes(result.total || 0);
+        }
+      } finally {
+        requestInFlight.current = false;
+        setLoading(false);
+        setRefreshing(false);
+        setIsLoadingMore(false);
       }
     },
     [],
   );
 
   useEffect(() => {
-    loadQuotes({ mode: "initial", page: 1, limit: pageSize });
+    loadQuotes({ mode: "initial", skip: 0, limit: pageSize });
   }, [loadQuotes]);
 
   const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadQuotes({ mode: "refresh", page: 1, limit: pageSize }).finally(() => {
-      setRefreshing(false);
-    });
+    setError(null);
+    loadQuotes({ mode: "refresh", skip: 0, limit: pageSize });
   }, [loadQuotes]);
 
   const filteredQuotes = useMemo(() => {
@@ -215,11 +213,9 @@ export default function Index() {
             }
             onEndReached={() => {
               if (quotes.length < totalQuotes) {
-                const nextPage = page + 1;
-                setPage(nextPage);
                 loadQuotes({
                   mode: "loadMore",
-                  page: nextPage,
+                  skip: quotes.length,
                   limit: pageSize,
                 });
               }
