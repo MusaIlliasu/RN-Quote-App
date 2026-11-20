@@ -28,6 +28,7 @@ export default function Index() {
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const debouncedSearchQuery = useDebounced(searchQuery, 500);
 
@@ -41,7 +42,7 @@ export default function Index() {
       page: number;
       limit: number;
     }) => {
-      if (loading || refreshing) return;
+      if (loading || refreshing || isLoadingMore) return;
 
       setError(null);
       if (mode === "initial") {
@@ -50,16 +51,23 @@ export default function Index() {
       if (mode === "refresh") {
         setRefreshing(true);
       }
+      if (mode === "loadMore") {
+        setIsLoadingMore(true);
+      }
+
       const result = await getQuotes({ limit, skip: (page - 1) * limit });
 
       setLoading(false);
       setRefreshing(false);
+      setIsLoadingMore(false);
+
       if (result.error) {
         setError(result.error);
         return;
       }
 
       if (result.quotes) {
+        // console.log("Fetched quotes: ", result.quotes[0]);
         setQuotes((prevQuotes) =>
           mode === "loadMore"
             ? [...prevQuotes, ...(result?.quotes || [])]
@@ -177,6 +185,26 @@ export default function Index() {
                     : "No quotes available."}
                 </Text>
               </View>
+            )}
+            ListFooterComponent={() => (
+              <>
+                {
+                  isLoadingMore ? (
+                    <View style={tw`flex-row justify-center items-center p-4 mt-4`}>
+                      <ActivityIndicator size="small" color="#6b7280" />
+                      <Text style={tw`text-gray-500 text-sm ml-2`}>Loading more quotes...</Text>
+                    </View>
+                  ) : null
+                }
+
+                {
+                  quotes.length >= totalQuotes && totalQuotes > 0 ? (
+                    <View style={tw`flex-row justify-center items-center p-4 mt-4`}>
+                      <Text style={tw`text-gray-500 text-sm`}>THE END</Text>
+                    </View>
+                  ) : null
+                }
+              </>
             )}
             refreshing={refreshing}
             refreshControl={
