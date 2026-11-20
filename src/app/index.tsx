@@ -3,7 +3,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  BlurEvent,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -11,7 +10,7 @@ import {
   RefreshControl,
   Text,
   TextInput,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "twrnc";
@@ -103,7 +102,7 @@ export default function Index() {
     <View style={tw`flex-1`}>
       {/* Header Section */}
       <View
-        style={[tw`bg-white p-4 shadow-md`, { paddingTop: insets.top + 20 }]}
+        style={[tw`bg-white p-4 shadow-md`, { paddingTop: insets.top + 10 }]}
       >
         {/* Logo */}
         <View style={tw`w-full flex-row justify-between items-center gap-1`}>
@@ -127,7 +126,7 @@ export default function Index() {
             onChangeText={(text) => setSearchQuery(text)}
             value={searchQuery}
             onFocus={() => setSearchActive(true)}
-            onBlur={(e: BlurEvent) => setSearchActive(false)}
+            onBlur={() => setSearchActive(false)}
           />
         </KeyboardAvoidingView>
 
@@ -176,6 +175,7 @@ export default function Index() {
               </View>
             )}
             ListEmptyComponent={() => (
+              loading || refreshing || isLoadingMore ? null :
               <View style={tw`flex-1 justify-center items-center p-4`}>
                 <Text style={tw`text-gray-500 text-sm`}>
                   {searchQuery
@@ -188,7 +188,7 @@ export default function Index() {
               <>
                 {
                   isLoadingMore ? (
-                    <View style={tw`flex-row justify-center items-center p-4 mt-4`}>
+                    <View style={tw`flex-row justify-center items-center p-4`}>
                       <ActivityIndicator size="small" color="#6b7280" />
                       <Text style={tw`text-gray-500 text-sm ml-2`}>Loading more quotes...</Text>
                     </View>
@@ -196,8 +196,8 @@ export default function Index() {
                 }
 
                 {
-                  quotes.length >= totalQuotes && totalQuotes > 0 ? (
-                    <View style={tw`flex-row justify-center items-center p-4 mt-4`}>
+                  quotes.length >= totalQuotes && filteredQuotes.length ? (
+                    <View style={tw`flex-row justify-center items-center p-4`}>
                       <Text style={tw`text-gray-500 text-sm`}>THE END</Text>
                     </View>
                   ) : null
